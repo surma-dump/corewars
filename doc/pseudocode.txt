@@ -19,9 +19,11 @@ Convention
 ==========
 
 Commands are written like this:
-	<Label> <OpCode>.<Modifier> <A-Mode><A-Field> <B-Mode><B-Field>
+	<Label> <OpCode>.<Modifier> <A-Mode><A-Value>, <B-Mode><B-Value>
+	                            |--- A-Field ---| |--- B-Field ---|
 
 Everything but the OpCode is optional.
+For the possible modes see the MOV description
 
 
 OpCodes
@@ -32,64 +34,114 @@ DAT
 	Description:
 		Effectively kills the current process
 	PseudoCode:
-		<Prologue>
-		asm("NOP")
+		DAT #A, #B:
+			<Prologue>
+			asm("NOP")
 
 
 MOV
 ---
 	Description:
-		Moves 
-0687 Move replaces the B-target with the A-value and queues the next
-0688 instruction (PC + 1).
-     
-0689 5.5.3 ADD
-0690 ADD replaces the B-target with the sum of the A-value and the B-value
-0691 (A-value + B-value) and queues the next instruction (PC + 1).  ADD.I
-0692 functions as ADD.F would.
-     
-0693 5.5.4 SUB
-0694 SUB replaces the B-target with the difference of the B-value and the
-0695 A-value (B-value - A-value) and queues the next instruction (PC + 1).
-0696 SUB.I functions as SUB.F would.
-     
-0697 5.5.5 MUL
-0698 MUL replaces the B-target with the product of the A-value and the
-0699 B-value (A-value * B-value) and queues the next instruction (PC + 1).
-0700 MUL.I functions as MUL.F would.
-     
-0701 5.5.6 DIV
-0702 DIV replaces the B-target with the integral result of dividing the
-0703 B-value by the A-value (B-value / A-value) and queues the next
-0704 instruction (PC + 1).  DIV.I functions as DIV.F would. If the
-0705 A-value is zero, the B-value is unchanged and the current task is
-0706 removed from the warrior's task queue.
-     
-0707 5.5.7 MOD
-0708 MOD replaces the B-target with the integral remainder of dividing the
-0709 B-value by the A-value (B-value % A-value) and queues the next
-0710 instruction (PC + 1).  MOD.I functions as MOD.F would. If the
-0711 A-value is zero, the B-value is unchanged and the current task is
-0712 removed from the warrior's task queue.
-     
-0713 5.5.8 JMP
-0714 JMP queues the sum of the program counter and the A-pointer.
-     
-0715 5.5.9 JMZ
-0716 JMZ tests the B-value to determine if it is zero.  If the B-value is
-0717 zero, the sum of the program counter and the A-pointer is queued.
-0718 Otherwise, the next instruction is queued (PC + 1).  JMZ.I functions
-0719 as JMZ.F would, i.e. it jumps if both the A-number and the B-number
-0720 of the B-instruction are zero.
-     
-0721 5.5.10 JMN
-0722 JMN tests the B-value to determine if it is zero.  If the B-value is
-0723 not zero, the sum of the program counter and the A-pointer is queued.
-0724 Otherwise, the next instruction is queued (PC + 1).  JMN.I functions
-0725 as JMN.F would, i.e. it jumps if both the A-number and the B-number
-0726 of the B-instruction are non-zero. This is not the negation of the
-0727 condition for JMZ.F.
-     
+		Moves A to B
+	PseudoCode:
+		MOV #A, B:
+			<Prologue>
+			mem[PC+B] = A
+			<Epilogue>
+		MOV A, B:
+			<Prologue>
+			mem[PC+B] = mem[PC+A]
+			<Epilogue>
+		MOV $A, B:
+			<Prologue>
+			s.a.
+			<Epilogue>
+		MOV *A, B:
+			<Prologue>
+			mem[PC+B] = mem[PC+A+mem[PC+A].AValue]
+			<Epilogue>
+		MOV @A, B:
+			<Prologue>
+			mem[PC+B] = mem[PC+A+mem[PC+A].BValue]
+			<Epilogue>
+		MOV {A, B:
+			<Prologue>
+			mem[PC+B] = mem[PC+A+(--mem[PC+A].AValue)]
+			<Epilogue>
+		MOV <A, B:
+			<Prologue>
+			mem[PC+B] = mem[PC+A+(--mem[PC+A].BValue)]
+			<Epilogue>
+		MOV }A, B:
+			<Prologue>
+			mem[PC+B] = mem[PC+A+(mem[PC+A].AValue--)]
+			<Epilogue>
+		MOV >A, B:
+			<Prologue>
+			mem[PC+B] = mem[PC+A+(mem[PC+A].BValue--)]
+			<Epilogue>
+
+
+ADD
+---
+	Description:
+		Adds A and B value pointed to by A, and stores result in B
+	Pseudocode:
+		<Prologue>
+		mem[PC+B] = mem[PC+A].AValue + mem[PC+A].BValue
+		<Epilogue>
+
+
+SUB and MUL
+-----------
+	Description:
+		Analogous to ADD
+
+
+DIV and MOD
+-----------
+	Description:
+		Analogous to ADD. Division by zero effectively kills
+		the process.
+
+
+JMP
+---
+	Description:
+		Jumps to another address.
+	Pseudocode:
+		<Prologue>
+		ProgramXQueue.Push_Back(PC+A)
+
+
+JMZ
+---
+	Description:
+		Like JMP, but only if B value is zero.
+	Pseudocode:
+		<Prologue>
+		if(mem[PC].BValue == 0)
+			ProgramXQueue.Push_Back(PC+A)
+		else
+			<Epilogue>
+
+
+JMN
+---
+	Description:
+		Like JMP, but only if B value is not zero.
+	Pseudocode:
+		<Prologue>
+		if(mem[PC].BValue != 0)
+			ProgramXQueue.Push_Back(PC+A)
+		else
+			<Epilogue>
+
+
+DJN
+---
+	Description:
+		Decrements the value pointed to by B
 0728 5.5.11 DJN
 0729 DJN decrements the B-value and the B-target, then tests the B-value
 0730 to determine if it is zero.  If the decremented B-value is not zero,
